@@ -1,5 +1,5 @@
 import logging
-from decimal import Decimal
+from decimal import Decimal, DecimalException
 
 from django.db import models
 from django.contrib.auth.models import User
@@ -45,25 +45,32 @@ class UserVault(models.Model):
         Charges the users credit card, with he passed $amount, if they are in the vault. Returns the payment_log instance
         or None (if charge fails etc.)
         """
+        # TODO: refactor! This is not how such operations should be done.
+        amount = Decimal(amount)
         try:
             result = Transaction.sale(
                 {
                     'amount': amount.quantize(Decimal('.01')),
                     'customer_id': self.vault_id,
-                    "options": {
-                        "submit_for_settlement": True
+                    'options': {
+                        'submit_for_settlement': True
                     }
                 }
             )
 
             if result.is_success:
                 # create a payment log
-                payment_log = PaymentLog.objects.create(user=self.user, amount=amount, transaction_id=result.transaction.id)
+                payment_log = PaymentLog.objects.create(user=self.user,
+                                        amount=amount,
+                                        transaction_id=result.transaction.id)
                 return payment_log
             else:
-                raise Exception('Logical error in CC transaction')
-        except Exception:
-            logging.error('Failed to charge $%s to user: %s with vault_id: %s' % (amount, self.user, self.vault_id))
+                logging.error("Bad braintree response %s" % result)
+                raise Exception("Logical error in CC transaction")
+        except Exception, e:
+            logging.error("Failed to charge $%s to user:"
+                " %s with vault_id: %s error was %s" % (amount, self.user,
+                                                     self.vault_id, e))
             return None
 
 class PaymentLog(models.Model):
