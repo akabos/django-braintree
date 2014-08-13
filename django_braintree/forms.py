@@ -82,8 +82,11 @@ class UserCCDetailsForm(forms.Form):
     
     def clean(self):
         today = datetime.today()
-        exp_month = int(self.cleaned_data['expiration_month'])
-        exp_year = int(int(self.cleaned_data['expiration_year']))
+        try:
+            exp_month = int(self.cleaned_data.get('expiration_month'))
+            exp_year = int(self.cleaned_data.get('expiration_year'))
+        except TypeError:
+            raise forms.ValidationError('Please enter valid expiration month and year')
         
         if exp_year < today.year or (exp_month <= today.month and exp_year <= today.year):
             raise forms.ValidationError('Please make sure your Credit Card expires in the future.')
