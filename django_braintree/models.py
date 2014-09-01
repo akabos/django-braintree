@@ -2,7 +2,7 @@ import logging
 from decimal import Decimal, DecimalException
 
 from django.db import models
-from django.contrib.auth.models import User
+from django.conf import settings
 
 from braintree import Transaction
 
@@ -20,7 +20,7 @@ class UserVaultManager(models.Manager):
 
     def is_in_vault(self, user):
         return True if self.filter(user=user) else False
-    
+
     def charge(self, user, vault_id=None):
         """If vault_id is not passed this will assume that there is only one instane of user and vault_id in the db."""
         assert self.is_in_vault(user)
@@ -32,14 +32,14 @@ class UserVaultManager(models.Manager):
 
 class UserVault(models.Model):
     """Keeping it open that one user can have multiple vault credentials, hence the FK to User and not a OneToOne."""
-    user = models.ForeignKey(User)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL)
     vault_id = models.CharField(max_length=64, unique=True)
-    
+
     objects = UserVaultManager()
-    
+
     def __unicode__(self):
         return self.user.username
-    
+
     def charge(self, amount):
         """
         Charges the users credit card, with he passed $amount, if they are in the vault. Returns the payment_log instance
@@ -78,10 +78,10 @@ class PaymentLog(models.Model):
     Captures raw charges made to a users credit card. Extra info related to this payment should be a OneToOneField
     referencing this model.
     """
-    user = models.ForeignKey(User)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL)
     amount = models.DecimalField(max_digits=7, decimal_places=2)
     timestamp = models.DateTimeField(auto_now=True)
     transaction_id = models.CharField(max_length=128)
-    
+
     def __unicode__(self):
         return '%s charged $%s - %s' % (self.user, self.amount, self.transaction_id)
